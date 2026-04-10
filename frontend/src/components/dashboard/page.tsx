@@ -1,63 +1,89 @@
 "use client";
-      
+
+import { useEffect, useMemo, useState } from "react";
+import DealForm from "./DealForm";
+import DealsTable from "./DealsTable";
+
+type Deal = any;
+
+export default function DashboardPage() {
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function loadDashboard() {
+    try {
+      setLoading(true);
+      // აქ შეგიძლია შენი API ჩასვა
+      setDeals([]);
+    } catch (err) {
+      setError("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteDeal(id: number) {
+    try {
+      setDeletingId(id);
+      // აქ უნდა წაშალო deal API-ით
+
       setMessage("Deal deleted successfully.");
       await loadDashboard();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete deal");
+      setError("Failed to delete deal");
     } finally {
       setDeletingId(null);
     }
   }
 
+  function handleEditDeal(deal: Deal) {
+    console.log("Edit:", deal);
+  }
+
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
+
   const topDeal = useMemo(() => {
-    return [...deals].sort((a, b) => b.analysis.score - a.analysis.score)[0] || null;
+    return (
+      [...deals].sort((a, b) => b.analysis?.score - a.analysis?.score)[0] ||
+      null
+    );
   }, [deals]);
 
   return (
     <main className="dashboard-shell">
-      <div className="dashboard-topbar">
-        <div>
-          <h1 style={{ marginBottom: 6 }}>Welcome back{user ? `, ${user.name}` : ""}</h1>
-          <div className="page-subtitle">STR deal analysis dashboard with live investment metrics.</div>
-        </div>
-        <div className="toolbar">
-          <button className="button secondary" onClick={() => { void loadDashboard(); }} type="button">Refresh</button>
-          <button className="button secondary" onClick={logout} type="button">Logout</button>
-        </div>
-      </div>
+      <h1>Dashboard</h1>
 
-      <KpiCards summary={summary} />
-
-      {topDeal ? (
-        <div className="surface-card" style={{ marginBottom: 20 }}>
-          <strong>Top Deal:</strong> {topDeal.title} — {topDeal.analysis.verdict} with score {topDeal.analysis.score}/100 and monthly cash flow ${topDeal.analysis.monthly_cash_flow}
-        </div>
-      ) : null}
-
-      {message ? <div className="info-box" style={{ marginBottom: 16 }}>{message}</div> : null}
-      {error ? <div className="error-box" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {message && <div>{message}</div>}
+      {error && <div style={{ color: "red" }}>{error}</div>}
 
       {loading ? (
-        <div className="loader-card" style={{ padding: 24 }}>Loading dashboard data...</div>
+        <div>Loading...</div>
       ) : (
-        <div className="dashboard-grid">
+        <>
+          {topDeal && (
+            <div>
+              Top Deal: {topDeal.title} ({topDeal.analysis?.score})
+            </div>
+          )}
+
           <DealForm
-            editingDeal={editingDeal}
-            onSubmitDeal={handleSubmitDeal}
-            onCancelEdit={() => setEditingDeal(null)}
-            submitting={saving}
+            onSubmit={() => {}}
+            submitting={false}
+            editingDeal={null}
           />
 
-          <section className="surface-card">
-            <div className="toolbar" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-              <div>
-                <h2 style={{ margin: 0 }}>Deals</h2>
-                <p className="page-subtitle" style={{ marginTop: 6 }}>Compare cash flow, ROI, cap rate, break-even, risk, and verdict.</p>
-              </div>
-            </div>
-            <DealsTable deals={deals} onEdit={setEditingDeal} onDelete={handleDeleteDeal} deletingId={deletingId} />
-          </section>
-        </div>
+          <DealsTable
+            deals={deals}
+            onEdit={handleEditDeal}
+            onDelete={handleDeleteDeal}
+            deletingId={deletingId}
+          />
+        </>
       )}
     </main>
   );
