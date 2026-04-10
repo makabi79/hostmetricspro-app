@@ -1,4 +1,18 @@
 "use client";
+
+type Deal = any;
+
+export default function DealsTable({
+  deals,
+  onEdit,
+  onDelete,
+  deletingId,
+}: {
+  deals: Deal[];
+  onEdit: (deal: Deal) => void;
+  onDelete: (id: number) => void;
+  deletingId: number | null;
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -22,19 +36,28 @@
                 <strong>{deal.title}</strong>
                 <div className="meta-text">{deal.location}</div>
               </td>
-              <td>{currency(deal.analysis.monthly_cash_flow)}</td>
+              <td>{deal.analysis.monthly_cash_flow}</td>
               <td>{deal.analysis.cash_on_cash_roi.toFixed(1)}%</td>
               <td>{deal.analysis.cap_rate.toFixed(1)}%</td>
               <td>{deal.analysis.break_even_occupancy.toFixed(1)}%</td>
               <td>{deal.analysis.score}/100</td>
-              <td>
-                <span className={`badge ${riskClass(deal.analysis.risk)}`}>{deal.analysis.risk}</span>
-              </td>
+              <td>{deal.analysis.risk}</td>
               <td>{deal.analysis.verdict}</td>
               <td>
                 <div className="toolbar">
-                  <button className="button secondary" onClick={() => onEdit(deal)} type="button">Edit</button>
-                  <button className="button danger" onClick={() => onDelete(deal.id)} type="button" disabled={deletingId === deal.id}>
+                  <button
+                    className="button secondary"
+                    onClick={() => onEdit(deal)}
+                    type="button"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="button danger"
+                    onClick={() => onDelete(deal.id)}
+                    type="button"
+                    disabled={deletingId === deal.id}
+                  >
                     {deletingId === deal.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
