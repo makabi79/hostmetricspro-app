@@ -1,5 +1,5 @@
 "use client";
-      }
+      
       setMessage("Deal deleted successfully.");
       await loadDashboard();
     } catch (err) {
