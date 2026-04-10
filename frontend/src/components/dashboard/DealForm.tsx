@@ -98,17 +98,32 @@ export default function DealForm({
         <div>
           <div>
             <label>Deal Title</label>
-            <input value={form.title} onChange={(e) => updateField("title", e.target.value)} />
+            <input
+              value={form.title}
+              onChange={(e) => updateField("title", e.target.value)}
+            />
           </div>
 
           <div>
             <label>Occupancy Rate %</label>
-            <input type="number" value={form.occupancy_rate} onChange={(e) => updateField("occupancy_rate", Number(e.target.value))} />
+            <input
+              type="number"
+              value={form.occupancy_rate}
+              onChange={(e) =>
+                updateField("occupancy_rate", Number(e.target.value))
+              }
+            />
           </div>
 
           <div>
             <label>Other Monthly Income</label>
-            <input type="number" value={form.other_monthly_income} onChange={(e) => updateField("other_monthly_income", Number(e.target.value))} />
+            <input
+              type="number"
+              value={form.other_monthly_income}
+              onChange={(e) =>
+                updateField("other_monthly_income", Number(e.target.value))
+              }
+            />
           </div>
         </div>
 
