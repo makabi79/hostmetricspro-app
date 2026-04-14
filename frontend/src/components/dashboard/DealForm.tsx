@@ -127,9 +127,7 @@ export default function DealForm({
           </div>
         </div>
 
-        <button type="submit">
-          {submitting ? "Saving..." : "Submit"}
-        </button>
+        <button type="submit">{submitting ? "Saving..." : "Submit"}</button>
       </form>
     </section>
   );
