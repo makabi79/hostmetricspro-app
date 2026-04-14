@@ -82,7 +82,11 @@ const API_URL =
 
 const FREE_PLAN_LIMIT_CODE = "FREE_PLAN_LIMIT_REACHED";
 const FREE_PLAN_LIMIT_MESSAGE = "You reached your free limit";
-const FREE_PLAN_UPGRADE_MESSAGE = "Payments are coming soon";
+const FREE_PLAN_UPGRADE_MESSAGE = "Upgrade to Pro to continue";
+
+type CheckoutSessionResponse = {
+  checkout_url: string;
+};
 
 export default function DashboardPage() {
   return (
@@ -108,6 +112,7 @@ function DashboardContent() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [pageError, setPageError] = useState("");
   const [formError, setFormError] = useState("");
@@ -244,16 +249,77 @@ function DashboardContent() {
     };
   }
 
+  async function startCheckout() {
+    try {
+      setCheckoutLoading(true);
+      setNotice(null);
+      setPageError("");
+
+      const token = getToken();
+
+      if (!token) {
+        handleUnauthorized();
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/billing/checkout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      let data: CheckoutSessionResponse | null = null;
+
+      try {
+        data = (await response.json()) as CheckoutSessionResponse;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const message =
+          (data as { detail?: string } | null)?.detail ||
+          "Failed to start Stripe checkout.";
+        throw new ApiRequestError(message, response.status);
+      }
+
+      if (!data?.checkout_url) {
+        throw new Error("Stripe checkout URL is missing.");
+      }
+
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      setNotice({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Failed to start Stripe checkout.",
+      });
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
   function showUpgradeNotice() {
     setNotice({
       type: "error",
       text: `${FREE_PLAN_LIMIT_MESSAGE}\n${FREE_PLAN_UPGRADE_MESSAGE}`,
-      actionLabel: "Info",
-      onAction: () =>
-        setNotice({
-          type: "error",
-          text: "Payments are coming soon.",
-        }),
+      actionLabel: "Upgrade to Pro",
+      onAction: () => {
+        void startCheckout();
+      },
     });
   }
 
@@ -428,7 +494,11 @@ function DashboardContent() {
         if (err.code === "EXPORT_REQUIRES_PRO") {
           setNotice({
             type: "error",
-            text: "PDF export is available on the Pro plan only. Payments are coming soon.",
+            text: "PDF export is available on the Pro plan only.",
+            actionLabel: "Upgrade to Pro",
+            onAction: () => {
+              void startCheckout();
+            },
           });
           return;
         }
@@ -444,10 +514,7 @@ function DashboardContent() {
   }
 
   async function handleUpgrade() {
-    setNotice({
-      type: "error",
-      text: "Payments are coming soon.",
-    });
+    await startCheckout();
   }
 
   async function handleOpenPortal() {
@@ -594,10 +661,11 @@ function DashboardContent() {
               {!isPro ? (
                 <button
                   type="button"
-                  className="primary-button cursor-not-allowed bg-slate-300"
-                  disabled
+                  onClick={handleUpgrade}
+                  disabled={checkoutLoading}
+                  className="primary-button"
                 >
-                  Payments Coming Soon
+                  {checkoutLoading ? "Redirecting to checkout..." : "Upgrade to Pro"}
                 </button>
               ) : (
                 <button
@@ -635,17 +703,18 @@ function DashboardContent() {
                 value, and export-ready reports.
               </p>
               <p className="text-sm text-slate-500">
-                Payments are coming soon.
+                Unlock unlimited deals, PDF export, and advanced workflow value.
               </p>
             </div>
 
             <div className="dashboard-upgrade-actions">
               <button
                 type="button"
-                className="primary-button cursor-not-allowed bg-slate-300"
-                disabled
+                onClick={handleUpgrade}
+                disabled={checkoutLoading}
+                className="primary-button"
               >
-                Payments Coming Soon
+                {checkoutLoading ? "Redirecting to checkout..." : "Upgrade to Pro"}
               </button>
             </div>
           </section>
@@ -954,10 +1023,11 @@ function DashboardContent() {
                   {!isPro ? (
                     <button
                       type="button"
-                      className="secondary-button cursor-not-allowed bg-slate-300"
-                      disabled
+                      onClick={handleUpgrade}
+                      disabled={checkoutLoading}
+                      className="secondary-button"
                     >
-                      Payments Coming Soon
+                      {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
                     </button>
                   ) : null}
                 </div>
@@ -1022,7 +1092,7 @@ function DashboardContent() {
                                 className="secondary-button"
                                 title={
                                   !isPro
-                                    ? "Payments are coming soon. PDF export will be available on Pro."
+                                    ? "PDF export is available on the Pro plan only."
                                     : undefined
                                 }
                               >
@@ -1157,3 +1227,4 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+>
