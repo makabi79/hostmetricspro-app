@@ -6,10 +6,16 @@ import { ApiRequestError, api } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import {
   createBillingPortal,
+  createCheckoutSession,
   fetchBillingStatus,
   type BillingStatus,
 } from "@/lib/billing";
-import type { DashboardSummary, Deal, DealPayload } from "@/lib/types";
+import type {
+  ActivateProResponse,
+  DashboardSummary,
+  Deal,
+  DealPayload,
+} from "@/lib/types";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -83,10 +89,7 @@ const API_URL =
 const FREE_PLAN_LIMIT_CODE = "FREE_PLAN_LIMIT_REACHED";
 const FREE_PLAN_LIMIT_MESSAGE = "You reached your free limit";
 const FREE_PLAN_UPGRADE_MESSAGE = "Upgrade to Pro to continue";
-
-type CheckoutSessionResponse = {
-  checkout_url: string;
-};
+const ADMIN_EMAIL = "admin@hostmetricspro.com";
 
 export default function DashboardPage() {
   return (
@@ -113,10 +116,12 @@ function DashboardContent() {
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [activatingPro, setActivatingPro] = useState(false);
 
   const [pageError, setPageError] = useState("");
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState<NoticeState>(null);
+  const [activationEmail, setActivationEmail] = useState("");
 
   useEffect(() => {
     void loadDashboard();
@@ -255,39 +260,7 @@ function DashboardContent() {
       setNotice(null);
       setPageError("");
 
-      const token = getToken();
-
-      if (!token) {
-        handleUnauthorized();
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/billing/checkout`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      let data: CheckoutSessionResponse | null = null;
-
-      try {
-        data = (await response.json()) as CheckoutSessionResponse;
-      } catch {
-        data = null;
-      }
-
-      if (!response.ok) {
-        const message =
-          (data as { detail?: string } | null)?.detail ||
-          "Failed to start Stripe checkout.";
-        throw new ApiRequestError(message, response.status);
-      }
+      const data = await createCheckoutSession();
 
       if (!data?.checkout_url) {
         throw new Error("Stripe checkout URL is missing.");
@@ -309,6 +282,45 @@ function DashboardContent() {
       });
     } finally {
       setCheckoutLoading(false);
+    }
+  }
+
+  async function handleAdminActivatePro(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const email = activationEmail.trim().toLowerCase();
+    if (!email) {
+      setNotice({ type: "error", text: "User email is required." });
+      return;
+    }
+
+    try {
+      setActivatingPro(true);
+      setNotice(null);
+      setPageError("");
+
+      const result: ActivateProResponse = await api.activateProByEmail(email);
+
+      setActivationEmail("");
+      setNotice({
+        type: "success",
+        text: `${result.email} is now on Pro.`,
+      });
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      setNotice({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Failed to activate Pro access.",
+      });
+    } finally {
+      setActivatingPro(false);
     }
   }
 
@@ -607,6 +619,7 @@ function DashboardContent() {
       : `${billingStatus.deals_used} / ${billingStatus.max_deals} deals`
     : "0 / 3 deals";
   const isPro = billingStatus?.is_pro ?? false;
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
   const freeDealsLeft =
     billingStatus && billingStatus.max_deals !== null
       ? Math.max(billingStatus.max_deals - billingStatus.deals_used, 0)
@@ -691,6 +704,39 @@ function DashboardContent() {
             </div>
           </div>
         </section>
+
+        {isAdmin ? (
+          <section className="dashboard-upgrade-banner">
+            <div>
+              <span className="section-label">Admin Tools</span>
+              <h2>One-click Pro activation</h2>
+              <p>
+                Enter a user email after Wise payment confirmation and activate
+                Pro access instantly.
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleAdminActivatePro}
+              className="dashboard-upgrade-actions"
+            >
+              <input
+                type="email"
+                value={activationEmail}
+                onChange={(event) => setActivationEmail(event.target.value)}
+                placeholder="user@example.com"
+                className="dashboard-admin-input"
+              />
+              <button
+                type="submit"
+                disabled={activatingPro}
+                className="primary-button"
+              >
+                {activatingPro ? "Activating Pro..." : "Activate Pro"}
+              </button>
+            </form>
+          </section>
+        ) : null}
 
         {!isPro ? (
           <section className="dashboard-upgrade-banner">

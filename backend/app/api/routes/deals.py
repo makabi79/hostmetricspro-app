@@ -153,7 +153,7 @@ def _int_like(value: float | int) -> str:
     return f"{float(value or 0):,.0f}"
 
 
-def _wrap_lines(text: str, max_chars: int = 82) -> list[str]:
+def _wrap_lines(text: str, max_chars: int = 78) -> list[str]:
     words = str(text or "").split()
     if not words:
         return [""]
@@ -173,13 +173,6 @@ def _wrap_lines(text: str, max_chars: int = 82) -> list[str]:
     return lines
 
 
-def _estimate_section_height(items: list[str], title_lines: int = 1) -> int:
-    title_space = 24 + (title_lines - 1) * 14
-    body_space = max(len(items), 1) * 15
-    padding = 20
-    return title_space + body_space + padding
-
-
 def _draw_text_block(
     commands: list[str],
     *,
@@ -188,7 +181,7 @@ def _draw_text_block(
     text: str,
     font: str = "/F1",
     size: int = 11,
-    color: str = "0.16 0.24 0.39 rg",
+    color: str = "0.18 0.24 0.33 rg",
 ) -> None:
     commands.extend(
         [
@@ -196,6 +189,43 @@ def _draw_text_block(
             f"BT {font} {size} Tf {x} {y} Td ({_pdf_text(text)}) Tj ET",
         ]
     )
+
+
+def _draw_label_value_row(
+    commands: list[str],
+    *,
+    x: int,
+    y: int,
+    label: str,
+    value: str,
+    label_font: str = "/F2",
+    value_font: str = "/F1",
+) -> None:
+    _draw_text_block(
+        commands,
+        x=x,
+        y=y,
+        text=label,
+        font=label_font,
+        size=10,
+        color="0.16 0.24 0.39 rg",
+    )
+    _draw_text_block(
+        commands,
+        x=x + 150,
+        y=y,
+        text=value,
+        font=value_font,
+        size=10,
+        color="0.25 0.32 0.43 rg",
+    )
+
+
+def _estimate_section_height(items: list[str]) -> int:
+    header_height = 36
+    body_height = max(len(items), 1) * 17
+    padding = 20
+    return header_height + body_height + padding
 
 
 def _draw_section(
@@ -213,12 +243,12 @@ def _draw_section(
             "1.00 1.00 1.00 rg",
             f"36 {bottom_y} 540 {box_height} re",
             "f",
-            "0.86 0.90 0.96 RG",
+            "0.87 0.91 0.96 RG",
             "1 w",
             f"36 {bottom_y} 540 {box_height} re",
             "S",
-            "0.94 0.96 0.99 rg",
-            f"36 {top_y - 34} 540 34 re",
+            "0.95 0.97 0.99 rg",
+            f"36 {top_y - 36} 540 36 re",
             "f",
         ]
     )
@@ -226,14 +256,14 @@ def _draw_section(
     _draw_text_block(
         commands,
         x=50,
-        y=top_y - 22,
+        y=top_y - 23,
         text=title,
         font="/F2",
         size=12,
-        color="0.14 0.21 0.34 rg",
+        color="0.12 0.19 0.31 rg",
     )
 
-    item_y = top_y - 50
+    item_y = top_y - 57
     for item in items:
         _draw_text_block(
             commands,
@@ -242,11 +272,11 @@ def _draw_section(
             text=item,
             font="/F1",
             size=10,
-            color="0.22 0.29 0.40 rg",
+            color="0.24 0.31 0.42 rg",
         )
-        item_y -= 15
+        item_y -= 17
 
-    return bottom_y - 16
+    return bottom_y - 18
 
 
 def _build_deal_pdf(deal: DealResponse) -> bytes:
@@ -258,17 +288,20 @@ def _build_deal_pdf(deal: DealResponse) -> bytes:
     verdict_text = analysis.verdict or "No verdict"
 
     if score_value >= 70:
-        score_fill = "0.90 0.98 0.93 rg"
-        score_stroke = "0.53 0.84 0.62 RG"
-        score_text = "0.09 0.45 0.22 rg"
+        score_fill = "0.91 0.98 0.93 rg"
+        score_stroke = "0.55 0.84 0.63 RG"
+        score_text = "0.08 0.46 0.22 rg"
+        badge_fill = "0.85 0.96 0.88 rg"
     elif score_value >= 45:
         score_fill = "1.00 0.97 0.89 rg"
         score_stroke = "0.95 0.80 0.40 RG"
-        score_text = "0.72 0.44 0.03 rg"
+        score_text = "0.71 0.44 0.03 rg"
+        badge_fill = "1.00 0.94 0.78 rg"
     else:
         score_fill = "1.00 0.92 0.92 rg"
         score_stroke = "0.93 0.55 0.55 RG"
         score_text = "0.73 0.16 0.16 rg"
+        badge_fill = "1.00 0.86 0.86 rg"
 
     content_commands: list[str] = [
         "0.98 0.99 1.00 rg",
@@ -292,14 +325,14 @@ def _build_deal_pdf(deal: DealResponse) -> bytes:
         content_commands,
         x=42,
         y=736,
-        text="STR Deal Analysis Report",
+        text="Professional STR Deal Analysis Report",
         font="/F1",
         size=11,
         color="0.88 0.93 1.00 rg",
     )
     _draw_text_block(
         content_commands,
-        x=430,
+        x=404,
         y=736,
         text=f"Generated {generated_at}",
         font="/F1",
@@ -313,59 +346,72 @@ def _build_deal_pdf(deal: DealResponse) -> bytes:
         y=694,
         text=deal.title or "Untitled Deal",
         font="/F2",
-        size=18,
-        color="0.10 0.16 0.28 rg",
+        size=19,
+        color="0.09 0.15 0.27 rg",
     )
     _draw_text_block(
         content_commands,
         x=42,
-        y=676,
+        y=675,
         text=deal.location or "No location provided",
         font="/F1",
         size=12,
-        color="0.35 0.43 0.55 rg",
+        color="0.34 0.42 0.54 rg",
     )
 
     content_commands.extend(
         [
             score_fill,
-            "402 648 174 54 re",
+            "390 640 186 66 re",
             "f",
             score_stroke,
             "1 w",
-            "402 648 174 54 re",
+            "390 640 186 66 re",
             "S",
+            badge_fill,
+            "404 681 64 14 re",
+            "f",
         ]
     )
+
     _draw_text_block(
         content_commands,
-        x=416,
+        x=414,
         y=684,
-        text="Score / Risk / Verdict",
-        font="/F1",
-        size=9,
-        color="0.35 0.43 0.55 rg",
+        text="DEAL SCORE",
+        font="/F2",
+        size=8,
+        color="0.26 0.33 0.44 rg",
     )
     _draw_text_block(
         content_commands,
-        x=416,
-        y=666,
-        text=f"Score: {_int_like(score_value)}",
+        x=404,
+        y=662,
+        text=f"{_int_like(score_value)} / 100",
         font="/F2",
-        size=12,
+        size=18,
         color=score_text,
     )
     _draw_text_block(
         content_commands,
-        x=416,
-        y=651,
-        text=f"Risk: {risk_text}  |  Verdict: {verdict_text}",
+        x=404,
+        y=646,
+        text=f"Risk: {risk_text}",
         font="/F1",
         size=10,
-        color="0.20 0.26 0.37 rg",
+        color="0.22 0.28 0.38 rg",
+    )
+    _draw_text_block(
+        content_commands,
+        x=404,
+        y=632,
+        text=f"Verdict: {verdict_text}",
+        font="/F1",
+        size=10,
+        color="0.22 0.28 0.38 rg",
     )
 
-    section_y = 626
+    section_y = 618
 
     deal_overview_items = [
         f"Property Title: {deal.title or 'Untitled Deal'}",
@@ -374,7 +420,8 @@ def _build_deal_pdf(deal: DealResponse) -> bytes:
         f"Updated: {deal.updated_at.strftime('%Y-%m-%d') if deal.updated_at else 'N/A'}",
     ]
     if deal.notes:
-        deal_overview_items.extend(_wrap_lines(f"Notes: {deal.notes}", max_chars=80))
+        note_lines = _wrap_lines(f"Notes: {deal.notes}", max_chars=78)
+        deal_overview_items.extend(note_lines)
 
     financial_inputs_items = [
         f"Purchase Price: {_currency(deal.purchase_price)}",
@@ -426,26 +473,48 @@ def _build_deal_pdf(deal: DealResponse) -> bytes:
         ("Expense Assumptions", expense_assumptions_items),
         ("Performance Metrics", performance_metrics_items),
     ]:
-        section_y = _draw_section(content_commands, top_y=section_y, title=title, items=items)
+        section_y = _draw_section(
+            content_commands,
+            top_y=section_y,
+            title=title,
+            items=items,
+        )
 
     score_section_items = [
-        f"Score: {_int_like(score_value)}",
-        f"Risk: {risk_text}",
+        f"Score: {_int_like(score_value)} / 100",
+        f"Risk Level: {risk_text}",
         f"Verdict: {verdict_text}",
-        "Use this report as a fast underwriting snapshot for STR deal review.",
+        "Use this report as a fast underwriting snapshot for STR investment review.",
     ]
     section_y = _draw_section(
         content_commands,
         top_y=section_y,
-        title="Score / Risk / Verdict",
+        title="Final Evaluation",
         items=score_section_items,
     )
 
+    content_commands.extend(
+        [
+            "0.88 0.91 0.95 RG",
+            "0.8 w",
+            "36 34 m 576 34 l",
+            "S",
+        ]
+    )
     _draw_text_block(
         content_commands,
         x=42,
-        y=22,
+        y=20,
         text="Generated by HostMetricsPro",
+        font="/F1",
+        size=9,
+        color="0.45 0.52 0.62 rg",
+    )
+    _draw_text_block(
+        content_commands,
+        x=430,
+        y=20,
+        text="ROI + cash flow + risk analysis",
         font="/F1",
         size=9,
         color="0.45 0.52 0.62 rg",

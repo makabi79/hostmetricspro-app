@@ -7,6 +7,7 @@ import { getToken } from "@/lib/auth";
 import {
   confirmCheckoutSession,
   createBillingPortal,
+  createCheckoutSession,
   fetchBillingStatus,
   type BillingStatus,
 } from "@/lib/billing";
@@ -59,6 +60,7 @@ export default function PricingPageClient() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
 
@@ -108,7 +110,17 @@ export default function PricingPageClient() {
   }, [checkoutState, checkoutSessionId]);
 
   const handleUpgrade = async () => {
-    setError("Payments are coming soon.");
+    try {
+      setCheckoutLoading(true);
+      setError("");
+      const data = await createCheckoutSession();
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to start checkout"
+      );
+      setCheckoutLoading(false);
+    }
   };
 
   const handleOpenPortal = async () => {
@@ -134,9 +146,6 @@ export default function PricingPageClient() {
           <p>
             Start free, validate the product, and upgrade when you need
             unlimited deal analysis, PDF export, and advanced analytics.
-          </p>
-          <p className="text-sm text-slate-500">
-            Early access is live. Pro payments are coming soon.
           </p>
         </div>
       </section>
@@ -187,10 +196,11 @@ export default function PricingPageClient() {
                 {!status.is_pro ? (
                   <button
                     type="button"
-                    className="primary-button cursor-not-allowed bg-slate-300"
+                    className="primary-button"
                     onClick={handleUpgrade}
+                    disabled={checkoutLoading}
                   >
-                    Payments Coming Soon
+                    {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
                   </button>
                 ) : (
                   <button
@@ -246,10 +256,11 @@ export default function PricingPageClient() {
                   ) : isProCard ? (
                     <button
                       type="button"
-                      className="primary-button cursor-not-allowed bg-slate-300"
+                      className="primary-button"
                       onClick={handleUpgrade}
+                      disabled={checkoutLoading}
                     >
-                      Payments Coming Soon
+                      {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
                     </button>
                   ) : (
                     <Link
@@ -303,9 +314,6 @@ export default function PricingPageClient() {
                 Test your workflow with the free plan, then unlock unlimited
                 deals, PDF export, and advanced analytics with Pro.
               </p>
-              <p className="text-sm text-slate-500">
-                Pro payments are coming soon.
-              </p>
             </div>
 
             <div className="cta-actions">
@@ -330,10 +338,11 @@ export default function PricingPageClient() {
               ) : (
                 <button
                   type="button"
-                  className="primary-button cursor-not-allowed bg-slate-300"
+                  className="primary-button"
                   onClick={handleUpgrade}
+                  disabled={checkoutLoading}
                 >
-                  Payments Coming Soon
+                  {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
                 </button>
               )}
             </div>

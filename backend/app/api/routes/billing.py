@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,18 @@ from app.services.stripe_service import (
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 FREE_PLAN_MAX_DEALS = 3
+ADMIN_EMAIL = "admin@hostmetricspro.com"
+
+
+class AdminActivateProRequest(BaseModel):
+    email: EmailStr
+
+
+class AdminActivateProResponse(BaseModel):
+    email: str
+    current_plan: str
+    subscription_status: str
+    is_pro: bool
 
 
 def get_or_create_subscription(db: Session, user_id: int) -> Subscription:
@@ -123,6 +136,40 @@ def get_billing_status(
         max_deals=None if is_pro else FREE_PLAN_MAX_DEALS,
         deals_used=deals_used,
         is_pro=is_pro,
+    )
+
+
+@router.post("/admin/activate-pro", response_model=AdminActivateProResponse)
+def admin_activate_pro(
+    payload: AdminActivateProRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AdminActivateProResponse:
+    if current_user.email.lower() != ADMIN_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+
+    target_user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    subscription = get_or_create_subscription(db, target_user.id)
+    subscription.current_plan = "pro"
+    subscription.subscription_status = "active"
+    db.add(subscription)
+    db.commit()
+    db.refresh(subscription)
+
+    return AdminActivateProResponse(
+        email=target_user.email,
+        current_plan=subscription.current_plan,
+        subscription_status=subscription.subscription_status,
+        is_pro=is_pro_subscription(subscription),
     )
 
 

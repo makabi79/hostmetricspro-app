@@ -87,3 +87,10 @@ export type ApiErrorResponse = {
         loc?: Array<string | number>;
       }>;
 };
+
+export type ActivateProResponse = {
+  email: string;
+  current_plan: string;
+  subscription_status: string;
+  is_pro: boolean;
+};

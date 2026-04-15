@@ -1,4 +1,5 @@
 import type {
+  ActivateProResponse,
   ApiErrorDetail,
   ApiErrorResponse,
   DashboardSummary,
@@ -11,6 +12,21 @@ import { clearSession, getToken } from "@/lib/auth";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001/api/v1";
+
+export type BillingStatus = {
+  current_plan: string;
+  subscription_status: string;
+  can_create_more_deals: boolean;
+  max_deals: number | null;
+  deals_used: number;
+  is_pro: boolean;
+};
+
+export type BillingConfirmResponse = {
+  current_plan: string;
+  subscription_status: string;
+  is_pro: boolean;
+};
 
 export class ApiRequestError extends Error {
   status: number;
@@ -184,6 +200,52 @@ export const api = {
       "/dashboard/summary",
       {
         method: "GET",
+      },
+      true
+    ),
+
+  activateProByEmail: (email: string) =>
+    request<ActivateProResponse>(
+      "/billing/admin/activate-pro",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+      true
+    ),
+
+  getBillingStatus: () =>
+    request<BillingStatus>(
+      "/billing/status",
+      {
+        method: "GET",
+      },
+      true
+    ),
+
+  createCheckoutSession: () =>
+    request<{ checkout_url: string }>(
+      "/billing/checkout",
+      {
+        method: "POST",
+      },
+      true
+    ),
+
+  confirmCheckoutSession: (sessionId: string) =>
+    request<BillingConfirmResponse>(
+      `/billing/confirm?session_id=${encodeURIComponent(sessionId)}`,
+      {
+        method: "GET",
+      },
+      true
+    ),
+
+  createBillingPortal: () =>
+    request<{ portal_url: string }>(
+      "/billing/portal",
+      {
+        method: "POST",
       },
       true
     ),

@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import type { User } from "@/lib/types";
-import { clearSession, getSession, getToken, setSession } from "@/lib/auth";
+import { clearSession, getToken, setSession } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 type AuthContextValue = {
   user: User | null;
@@ -25,17 +26,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 🔥 CRITICAL FIX: validate token with backend
   useEffect(() => {
-    const { token, user } = getSession();
+    const initAuth = async () => {
+      const token = getToken();
 
-    if (token && user) {
-      setUserState(user);
-    } else {
-      clearSession();
-      setUserState(null);
-    }
+      if (!token) {
+        clearSession();
+        setUserState(null);
+        setLoading(false);
+        return;
+      }
 
-    setLoading(false);
+      try {
+        const realUser = await api.me(); // ✅ SOURCE OF TRUTH
+        setSession(token, realUser);
+        setUserState(realUser);
+      } catch (err) {
+        clearSession();
+        setUserState(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = (token: string, nextUser: User) => {
@@ -56,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const token = getToken();
-
     if (!token) {
       clearSession();
       setUserState(null);
