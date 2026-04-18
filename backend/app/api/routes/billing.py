@@ -63,8 +63,33 @@ def is_pro_subscription(subscription: Subscription) -> bool:
     )
 
 
-def get_user_id_from_stripe_object(stripe_object: dict[str, Any]) -> int | None:
-    metadata = stripe_object.get("metadata") or {}
+def get_value(source: Any, key: str, default: Any = None) -> Any:
+    if source is None:
+        return default
+
+    if isinstance(source, dict):
+        return source.get(key, default)
+
+    return getattr(source, key, default)
+
+
+def get_nested_value(source: Any, path: list[str], default: Any = None) -> Any:
+    current = source
+
+    for key in path:
+        if current is None:
+            return default
+
+        if isinstance(current, dict):
+            current = current.get(key)
+        else:
+            current = getattr(current, key, None)
+
+    return default if current is None else current
+
+
+def get_user_id_from_stripe_object(stripe_object: Any) -> int | None:
+    metadata = get_value(stripe_object, "metadata", {}) or {}
     user_id_raw = metadata.get("user_id")
     if not user_id_raw:
         return None
@@ -77,14 +102,14 @@ def get_user_id_from_stripe_object(stripe_object: dict[str, Any]) -> int | None:
 
 def find_subscription_for_event(
     db: Session,
-    stripe_object: dict[str, Any],
+    stripe_object: Any,
 ) -> Subscription | None:
     user_id = get_user_id_from_stripe_object(stripe_object)
     if user_id is not None:
         return get_or_create_subscription(db, user_id)
 
-    stripe_subscription_id = stripe_object.get("id")
-    stripe_customer_id = stripe_object.get("customer")
+    stripe_subscription_id = get_value(stripe_object, "id")
+    stripe_customer_id = get_value(stripe_object, "customer")
 
     filters = []
 
@@ -102,21 +127,22 @@ def find_subscription_for_event(
 
 def sync_subscription_from_stripe_object(
     subscription: Subscription,
-    stripe_object: dict[str, Any],
+    stripe_object: Any,
 ) -> None:
-    stripe_status = stripe_object.get("status", "inactive")
-    items = stripe_object.get("items", {}).get("data", [])
+    stripe_status = get_value(stripe_object, "status", "inactive")
+    items = get_nested_value(stripe_object, ["items", "data"], []) or []
     price_id = None
 
     if items:
-        price_id = items[0].get("price", {}).get("id")
+        first_item = items[0]
+        price_id = get_nested_value(first_item, ["price", "id"])
 
     subscription.subscription_status = stripe_status
     subscription.current_plan = (
         "pro" if stripe_status in {"active", "trialing"} else "free"
     )
-    subscription.stripe_subscription_id = stripe_object.get("id")
-    subscription.stripe_customer_id = stripe_object.get("customer")
+    subscription.stripe_subscription_id = get_value(stripe_object, "id")
+    subscription.stripe_customer_id = get_value(stripe_object, "customer")
     subscription.stripe_price_id = price_id
 
 
@@ -303,7 +329,7 @@ async def stripe_webhook(
     try:
         event = construct_webhook_event(payload, stripe_signature)
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -311,12 +337,12 @@ async def stripe_webhook(
     data_object = event["data"]["object"]
 
     if event_type == "checkout.session.completed":
-        user_id_raw = (
-            data_object.get("metadata", {}).get("user_id")
-            or data_object.get("client_reference_id")
+        metadata = get_value(data_object, "metadata", {}) or {}
+        user_id_raw = metadata.get("user_id") or get_value(
+            data_object, "client_reference_id"
         )
-        customer_id = data_object.get("customer")
-        subscription_id = data_object.get("subscription")
+        customer_id = get_value(data_object, "customer")
+        subscription_id = get_value(data_object, "subscription")
 
         if user_id_raw:
             try:
@@ -358,7 +384,7 @@ async def stripe_webhook(
             db.commit()
 
     elif event_type == "invoice.payment_failed":
-        stripe_customer_id = data_object.get("customer")
+        stripe_customer_id = get_value(data_object, "customer")
 
         if stripe_customer_id:
             subscription = (
