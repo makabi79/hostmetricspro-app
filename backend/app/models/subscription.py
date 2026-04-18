@@ -23,9 +23,21 @@ class Subscription(Base):
         default="inactive",
         nullable=False,
     )
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    stripe_price_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paddle_customer_id: Mapped[str | None] = mapped_column(
+        "stripe_customer_id",
+        String(255),
+        nullable=True,
+    )
+    paddle_subscription_id: Mapped[str | None] = mapped_column(
+        "stripe_subscription_id",
+        String(255),
+        nullable=True,
+    )
+    paddle_price_id: Mapped[str | None] = mapped_column(
+        "stripe_price_id",
+        String(255),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

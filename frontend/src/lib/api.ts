@@ -1,5 +1,4 @@
 import type {
-  ActivateProResponse,
   ApiErrorDetail,
   ApiErrorResponse,
   DashboardSummary,
@@ -200,16 +199,6 @@ export const api = {
       "/dashboard/summary",
       {
         method: "GET",
-      },
-      true
-    ),
-
-  activateProByEmail: (email: string) =>
-    request<ActivateProResponse>(
-      "/billing/admin/activate-pro",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
       },
       true
     ),

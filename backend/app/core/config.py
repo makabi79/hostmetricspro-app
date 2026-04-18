@@ -23,9 +23,10 @@ class Settings(BaseSettings):
         ]
     )
     app_base_url: str = "http://localhost:3000"
-    stripe_secret_key: str = ""
-    stripe_webhook_secret: str = ""
-    stripe_pro_price_id: str = ""
+    paddle_api_key: str = ""
+    paddle_webhook_secret: str = ""
+    paddle_pro_price_id: str = ""
+    paddle_webhook_tolerance_seconds: int = 300
 
     model_config = SettingsConfigDict(
         env_file=".env",
