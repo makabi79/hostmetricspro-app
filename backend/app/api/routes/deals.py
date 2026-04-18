@@ -43,11 +43,29 @@ def is_pro_subscription(subscription: Subscription) -> bool:
     )
 
 
-def build_error_detail(*, code: str, message: str) -> dict:
-    return {
+def build_error_detail(
+    *,
+    code: str,
+    message: str,
+    current_plan: str | None = None,
+    deals_used: int | None = None,
+    deals_limit: int | None = None,
+) -> dict:
+    detail = {
         "code": code,
         "message": message,
     }
+
+    if current_plan is not None:
+        detail["current_plan"] = current_plan
+
+    if deals_used is not None:
+        detail["deals_used"] = deals_used
+
+    if deals_limit is not None:
+        detail["deals_limit"] = deals_limit
+
+    return detail
 
 
 def model_metric_keys() -> set[str]:
@@ -588,6 +606,9 @@ def create_deal(
             detail=build_error_detail(
                 code=FREE_PLAN_LIMIT_CODE,
                 message=FREE_PLAN_LIMIT_MESSAGE,
+                current_plan=subscription.current_plan,
+                deals_used=deal_count,
+                deals_limit=FREE_PLAN_MAX_DEALS,
             ),
         )
 
@@ -638,6 +659,7 @@ def export_deal_pdf(
             detail=build_error_detail(
                 code="EXPORT_REQUIRES_PRO",
                 message="PDF export is available on the Pro plan only.",
+                current_plan=subscription.current_plan,
             ),
         )
 

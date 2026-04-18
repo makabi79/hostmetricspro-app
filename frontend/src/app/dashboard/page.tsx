@@ -324,10 +324,12 @@ function DashboardContent() {
     }
   }
 
-  function showUpgradeNotice() {
+  function showUpgradeNotice(customText?: string) {
     setNotice({
       type: "error",
-      text: `${FREE_PLAN_LIMIT_MESSAGE}\n${FREE_PLAN_UPGRADE_MESSAGE}`,
+      text: customText
+        ? `${customText}\n${FREE_PLAN_UPGRADE_MESSAGE}`
+        : `${FREE_PLAN_LIMIT_MESSAGE}\n${FREE_PLAN_UPGRADE_MESSAGE}`,
       actionLabel: "Upgrade to Pro",
       onAction: () => {
         void startCheckout();
@@ -383,8 +385,9 @@ function DashboardContent() {
         }
 
         if (err.code === FREE_PLAN_LIMIT_CODE) {
-          showUpgradeNotice();
+          showUpgradeNotice(FREE_PLAN_LIMIT_MESSAGE);
           setFormError(FREE_PLAN_LIMIT_MESSAGE);
+          await loadDashboard();
           return;
         }
 
@@ -428,6 +431,11 @@ function DashboardContent() {
   }
 
   async function handleExport(id: number, title: string) {
+    if (!isPro) {
+      showUpgradeNotice("PDF export is available on the Pro plan only.");
+      return;
+    }
+
     try {
       setExportingId(id);
       setNotice(null);
@@ -504,14 +512,7 @@ function DashboardContent() {
         }
 
         if (err.code === "EXPORT_REQUIRES_PRO") {
-          setNotice({
-            type: "error",
-            text: "PDF export is available on the Pro plan only.",
-            actionLabel: "Upgrade to Pro",
-            onAction: () => {
-              void startCheckout();
-            },
-          });
+          showUpgradeNotice("PDF export is available on the Pro plan only.");
           return;
         }
       }
@@ -1099,7 +1100,6 @@ function DashboardContent() {
                       const verdict = deal.analysis?.verdict ?? "No verdict";
                       const isDeleting = deletingId === deal.id;
                       const isExporting = exportingId === deal.id;
-                      const exportDisabled = !isPro && !isExporting;
 
                       return (
                         <tr key={deal.id}>
@@ -1134,7 +1134,7 @@ function DashboardContent() {
                               <button
                                 type="button"
                                 onClick={() => handleExport(deal.id, deal.title)}
-                                disabled={isExporting || exportDisabled}
+                                disabled={isExporting}
                                 className="secondary-button"
                                 title={
                                   !isPro
