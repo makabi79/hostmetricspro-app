@@ -40,6 +40,26 @@ class AdminActivateProResponse(BaseModel):
     is_pro: bool
 
 
+def get_value(source: Any, key: str, default: Any = None) -> Any:
+    if source is None:
+        return default
+    if isinstance(source, dict):
+        return source.get(key, default)
+    return getattr(source, key, default)
+
+
+def get_nested_value(source: Any, path: list[str], default: Any = None) -> Any:
+    current = source
+    for key in path:
+        if current is None:
+            return default
+        if isinstance(current, dict):
+            current = current.get(key)
+        else:
+            current = getattr(current, key, None)
+    return default if current is None else current
+
+
 def get_or_create_subscription(db: Session, user_id: int) -> Subscription:
     subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
     if subscription:
@@ -61,31 +81,6 @@ def is_pro_subscription(subscription: Subscription) -> bool:
         subscription.current_plan == "pro"
         and subscription.subscription_status in {"active", "trialing"}
     )
-
-
-def get_value(source: Any, key: str, default: Any = None) -> Any:
-    if source is None:
-        return default
-
-    if isinstance(source, dict):
-        return source.get(key, default)
-
-    return getattr(source, key, default)
-
-
-def get_nested_value(source: Any, path: list[str], default: Any = None) -> Any:
-    current = source
-
-    for key in path:
-        if current is None:
-            return default
-
-        if isinstance(current, dict):
-            current = current.get(key)
-        else:
-            current = getattr(current, key, None)
-
-    return default if current is None else current
 
 
 def get_user_id_from_stripe_object(stripe_object: Any) -> int | None:
@@ -333,8 +328,9 @@ async def stripe_webhook(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    event_type = event["type"]
-    data_object = event["data"]["object"]
+    event_type = get_value(event, "type")
+    data = get_value(event, "data", {})
+    data_object = get_value(data, "object")
 
     if event_type == "checkout.session.completed":
         metadata = get_value(data_object, "metadata", {}) or {}
