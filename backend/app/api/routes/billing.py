@@ -81,7 +81,7 @@ def is_pro_subscription(subscription: Subscription) -> bool:
 
 
 def get_user_id_from_stripe_object(stripe_object: Any) -> int | None:
-    metadata = get_value(stripe_object, "metadata", None)
+    metadata = get_value(stripe_object, "metadata") or {}
     user_id_raw = get_value(metadata, "user_id")
 
     if not user_id_raw:
@@ -331,27 +331,29 @@ async def stripe_webhook(
     data_object = get_value(data, "object")
 
     if event_type == "checkout.session.completed":
-        metadata = get_value(data_object, "metadata")
-        user_id_raw = get_value(metadata, "user_id") or get_value(
-            data_object, "client_reference_id"
+        metadata = get_value(data_object, "metadata") or {}
+        user_id_raw = (
+            get_value(metadata, "user_id")
+            or get_value(data_object, "client_reference_id")
         )
         customer_id = get_value(data_object, "customer")
         subscription_id = get_value(data_object, "subscription")
 
+        user_id = None
         if user_id_raw:
             try:
                 user_id = int(user_id_raw)
             except (TypeError, ValueError):
                 user_id = None
 
-            if user_id is not None:
-                subscription = get_or_create_subscription(db, user_id)
-                subscription.stripe_customer_id = customer_id
-                subscription.stripe_subscription_id = subscription_id
-                subscription.current_plan = "pro"
-                subscription.subscription_status = "active"
-                db.add(subscription)
-                db.commit()
+        if user_id is not None:
+            subscription = get_or_create_subscription(db, user_id)
+            subscription.stripe_customer_id = customer_id
+            subscription.stripe_subscription_id = subscription_id
+            subscription.current_plan = "pro"
+            subscription.subscription_status = "active"
+            db.add(subscription)
+            db.commit()
 
     elif event_type in {"customer.subscription.created", "customer.subscription.updated"}:
         subscription = find_subscription_for_event(db, data_object)
