@@ -51,13 +51,10 @@ def get_value(source: Any, key: str, default: Any = None) -> Any:
 def get_nested_value(source: Any, path: list[str], default: Any = None) -> Any:
     current = source
     for key in path:
+        current = get_value(current, key, None)
         if current is None:
             return default
-        if isinstance(current, dict):
-            current = current.get(key)
-        else:
-            current = getattr(current, key, None)
-    return default if current is None else current
+    return current
 
 
 def get_or_create_subscription(db: Session, user_id: int) -> Subscription:
@@ -84,8 +81,9 @@ def is_pro_subscription(subscription: Subscription) -> bool:
 
 
 def get_user_id_from_stripe_object(stripe_object: Any) -> int | None:
-    metadata = get_value(stripe_object, "metadata", {}) or {}
-    user_id_raw = metadata.get("user_id")
+    metadata = get_value(stripe_object, "metadata", None)
+    user_id_raw = get_value(metadata, "user_id")
+
     if not user_id_raw:
         return None
 
@@ -329,12 +327,12 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     event_type = get_value(event, "type")
-    data = get_value(event, "data", {})
+    data = get_value(event, "data")
     data_object = get_value(data, "object")
 
     if event_type == "checkout.session.completed":
-        metadata = get_value(data_object, "metadata", {}) or {}
-        user_id_raw = metadata.get("user_id") or get_value(
+        metadata = get_value(data_object, "metadata")
+        user_id_raw = get_value(metadata, "user_id") or get_value(
             data_object, "client_reference_id"
         )
         customer_id = get_value(data_object, "customer")
