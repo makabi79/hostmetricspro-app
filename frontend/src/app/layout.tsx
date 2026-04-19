@@ -36,6 +36,18 @@ export default function RootLayout({
                   <a href="/signup" className="site-footer-link">
                     Signup
                   </a>
+                  <a href="/terms" className="site-footer-link">
+                    Terms of Service
+                  </a>
+                  <a href="/privacy" className="site-footer-link">
+                    Privacy Policy
+                  </a>
+                  <a
+                    href="mailto:support@hostmetricpro.com"
+                    className="site-footer-link"
+                  >
+                    Contact
+                  </a>
                 </div>
               </div>
             </footer>
