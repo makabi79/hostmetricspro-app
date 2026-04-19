@@ -43,7 +43,7 @@ export default function RootLayout({
                     Privacy Policy
                   </a>
                   <a
-                    href="mailto:support@hostmetricpro.com"
+                    href="mailto:support.hostmetricpro@gmail.com"
                     className="site-footer-link"
                   >
                     Contact
