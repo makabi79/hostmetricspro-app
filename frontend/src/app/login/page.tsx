@@ -5,7 +5,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { hasSession } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,7 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!authLoading && (user || hasSession())) {
+    if (!authLoading && user) {
       router.replace("/dashboard");
     }
   }, [authLoading, user, router]);

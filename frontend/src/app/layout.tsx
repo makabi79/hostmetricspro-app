@@ -42,6 +42,9 @@ export default function RootLayout({
                   <a href="/privacy" className="site-footer-link">
                     Privacy Policy
                   </a>
+                  <a href="/refund" className="site-footer-link">
+                    Refund Policy
+                  </a>
                   <a
                     href="mailto:support.hostmetricpro@gmail.com"
                     className="site-footer-link"
