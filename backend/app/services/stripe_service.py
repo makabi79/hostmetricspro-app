@@ -72,7 +72,11 @@ def _parse_api_error_body(raw_body: bytes) -> str:
     return "Paddle API request failed."
 
 
-def _api_request(method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def _api_request(
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     ensure_paddle_api_key()
 
     body = json.dumps(payload or {}).encode("utf-8")
@@ -98,6 +102,10 @@ def _api_request(method: str, path: str, payload: dict[str, Any] | None = None) 
         raise ValueError("Invalid response from Paddle API.") from exc
 
 
+def _build_checkout_return_url() -> str:
+    return f"{settings.app_base_url}/billing/confirm"
+
+
 def create_checkout_session(
     *,
     user_id: int,
@@ -119,7 +127,7 @@ def create_checkout_session(
             "user_email": email,
         },
         "checkout": {
-            "url": settings.app_base_url,
+            "url": _build_checkout_return_url(),
         },
     }
 

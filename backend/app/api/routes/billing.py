@@ -127,6 +127,27 @@ def sync_subscription_from_paddle_object(
     subscription.paddle_price_id = price_id
 
 
+def sync_customer_from_transaction_object(
+    subscription: Subscription,
+    paddle_object: Any,
+) -> None:
+    paddle_customer_id = get_value(paddle_object, "customer_id")
+    items = get_value(paddle_object, "items", []) or []
+    price_id = None
+
+    if items:
+        first_item = items[0]
+        price_id = get_nested_value(first_item, ["price", "id"]) or get_value(
+            first_item, "price_id"
+        )
+
+    if paddle_customer_id:
+        subscription.paddle_customer_id = paddle_customer_id
+
+    if price_id:
+        subscription.paddle_price_id = price_id
+
+
 @router.get("/status", response_model=BillingStatusResponse)
 def get_billing_status(
     db: Session = Depends(get_db),
@@ -178,11 +199,13 @@ def start_checkout(
 
 @router.get("/confirm", response_model=BillingConfirmResponse)
 def confirm_checkout(
-    session_id: str = Query(..., min_length=1),
+    transaction_id: str | None = Query(default=None, min_length=1),
+    _ptxn: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BillingConfirmResponse:
-    _ = session_id
+    _ = transaction_id
+    _ = _ptxn
 
     subscription = get_or_create_subscription(db, current_user.id)
 
@@ -239,6 +262,16 @@ async def paddle_webhook(
 
     event_type = get_value(event, "event_type") or get_value(event, "type")
     data_object = get_value(event, "data")
+
+    if event_type in {
+        "transaction.completed",
+    }:
+        subscription = find_subscription_for_event(db, data_object)
+
+        if subscription:
+            sync_customer_from_transaction_object(subscription, data_object)
+            db.add(subscription)
+            db.commit()
 
     if event_type in {
         "subscription.created",
