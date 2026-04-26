@@ -96,7 +96,7 @@ export default function HomePage() {
                     </h2>
                   </div>
 
-                  <span className="status-pill status-pill-review">Review</span>
+                  <span className="status-pill status-pill-review">BUY</span>
                 </div>
 
                 <div className="deal-preview-metrics">
@@ -111,7 +111,7 @@ export default function HomePage() {
                   <Row label="Risk level" value="Medium" highlight />
                   <Row
                     label="Verdict"
-                    value="Strong cash-flow potential with manageable risk"
+                    value="BUY: strong cash-flow potential with manageable risk"
                   />
                 </div>
               </div>
