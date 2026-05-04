@@ -25,7 +25,7 @@ const plans = [
     price: "$29",
     period: "/month",
     description:
-      "Best for active Airbnb hosts and investors analyzing deals regularly.",
+      "Stop guessing your Airbnb deal profitability. Know your real cash flow, ROI, and risk BEFORE you buy. Built for serious STR investors.",
     features: [
       "Unlimited deals",
       "PDF export",
@@ -44,7 +44,7 @@ const comparisonRows = [
   { feature: "Cap rate and ROI", free: "Included", pro: "Included" },
   { feature: "Deal score and verdict", free: "Included", pro: "Included" },
   { feature: "PDF export", free: "Not included", pro: "Included" },
-  { feature: "Payment", free: "No payment required", pro: "Wise / Payoneer" },
+  { feature: "Payment", free: "No payment required", pro: "Wise" },
 ];
 
 export default function PricingPageClient() {
@@ -114,7 +114,7 @@ export default function PricingPageClient() {
               <div className="billing-status-actions">
                 {!status.is_pro ? (
                   <Link href="/upgrade" className="primary-button">
-                    Upgrade to Pro
+                    Start analyzing unlimited deals
                   </Link>
                 ) : (
                   <Link href="/dashboard" className="secondary-button">
@@ -160,12 +160,25 @@ export default function PricingPageClient() {
                     ))}
                   </ul>
 
+                  {isProCard ? (
+                    <div style={{ marginTop: "12px", fontSize: "14px" }}>
+                      ✔ No risk — cancel anytime <br />
+                      ✔ Instant analysis in seconds <br />
+                      ✔ Built for real investors, not theory
+                    </div>
+                  ) : null}
+
                   {isCurrentPlan ? (
                     <div className="current-plan-badge">Current plan</div>
                   ) : isProCard ? (
-                    <Link href="/upgrade" className="primary-button">
-                      Upgrade to Pro
-                    </Link>
+                    <>
+                      <Link href="/upgrade" className="primary-button">
+                        Start analyzing unlimited deals
+                      </Link>
+                      <p style={{ fontSize: "12px", marginTop: "8px", color: "#666" }}>
+                        Early users price: $29/month. May increase later.
+                      </p>
+                    </>
                   ) : (
                     <Link
                       href={status ? "/dashboard" : "/signup"}
@@ -185,10 +198,11 @@ export default function PricingPageClient() {
         <div className="container">
           <div className="section-heading">
             <span className="section-label">Compare plans</span>
-            <h2>Free for testing. Pro for active investing.</h2>
+            <h2>Free for testing. Pro for serious STR investing.</h2>
             <p>
-              One bad deal can cost you far more than a monthly subscription.
-              Upgrade when you need more volume and better outputs.
+              One bad deal can cost far more than a monthly subscription. Pro
+              helps you review cash flow, ROI, risk, and deal quality before you
+              make a buying decision.
             </p>
           </div>
 
@@ -213,10 +227,10 @@ export default function PricingPageClient() {
           <div className="cta-banner">
             <div>
               <span className="section-label">Manual upgrade path</span>
-              <h2>Start free. Upgrade manually when you are ready.</h2>
+              <h2>Start free. Upgrade when you need unlimited analysis.</h2>
               <p>
-                Pay with Wise or Payoneer, then your Pro plan will be activated
-                manually after payment confirmation.
+                Pay securely with Wise. Your Pro plan will be activated manually
+                after payment confirmation.
               </p>
             </div>
 
@@ -236,7 +250,7 @@ export default function PricingPageClient() {
                 </Link>
               ) : (
                 <Link href="/upgrade" className="primary-button">
-                  Upgrade to Pro
+                  Start analyzing unlimited deals
                 </Link>
               )}
             </div>
