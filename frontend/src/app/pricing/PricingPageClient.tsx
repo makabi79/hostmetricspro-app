@@ -1,16 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { getToken } from "@/lib/auth";
-import {
-  confirmCheckoutSession,
-  createBillingPortal,
-  createCheckoutSession,
-  fetchBillingStatus,
-  type BillingStatus,
-} from "@/lib/billing";
+import { fetchBillingStatus, type BillingStatus } from "@/lib/billing";
 
 const plans = [
   {
@@ -37,7 +30,7 @@ const plans = [
       "Unlimited deals",
       "PDF export",
       "Advanced analytics",
-      "Billing management",
+      "Manual Pro activation after payment",
       "Premium feature access",
       "Professional workflow",
     ],
@@ -51,29 +44,13 @@ const comparisonRows = [
   { feature: "Cap rate and ROI", free: "Included", pro: "Included" },
   { feature: "Deal score and verdict", free: "Included", pro: "Included" },
   { feature: "PDF export", free: "Not included", pro: "Included" },
-  { feature: "Advanced analytics", free: "Not included", pro: "Included" },
+  { feature: "Payment", free: "No payment required", pro: "Wise / Payoneer" },
 ];
 
 export default function PricingPageClient() {
-  const searchParams = useSearchParams();
-
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [portalLoading, setPortalLoading] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
-
-  const checkoutState = useMemo(() => {
-    const value = searchParams.get("checkout");
-    if (value === "success") return "success";
-    if (value === "cancel") return "cancel";
-    return null;
-  }, [searchParams]);
-
-  const checkoutSessionId = useMemo(() => {
-    return searchParams.get("session_id");
-  }, [searchParams]);
 
   useEffect(() => {
     const token = getToken();
@@ -83,15 +60,10 @@ export default function PricingPageClient() {
       return;
     }
 
-    const load = async () => {
+    async function loadBillingStatus() {
       try {
         setLoading(true);
         setError("");
-
-        if (checkoutState === "success" && checkoutSessionId) {
-          setConfirming(true);
-          await confirmCheckoutSession(checkoutSessionId);
-        }
 
         const data = await fetchBillingStatus();
         setStatus(data);
@@ -101,41 +73,12 @@ export default function PricingPageClient() {
           err instanceof Error ? err.message : "Failed to load billing status"
         );
       } finally {
-        setConfirming(false);
         setLoading(false);
       }
-    };
-
-    void load();
-  }, [checkoutState, checkoutSessionId]);
-
-  const handleUpgrade = async () => {
-    try {
-      setCheckoutLoading(true);
-      setError("");
-      const data = await createCheckoutSession();
-      window.location.href = data.checkout_url;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to start checkout"
-      );
-      setCheckoutLoading(false);
     }
-  };
 
-  const handleOpenPortal = async () => {
-    try {
-      setPortalLoading(true);
-      setError("");
-      const data = await createBillingPortal();
-      window.location.href = data.portal_url;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to open billing portal"
-      );
-      setPortalLoading(false);
-    }
-  };
+    void loadBillingStatus();
+  }, []);
 
   return (
     <main className="pricing-page">
@@ -144,7 +87,7 @@ export default function PricingPageClient() {
           <span className="badge">Simple pricing</span>
           <h1>Choose the plan that fits your investing workflow</h1>
           <p>
-            Start free, validate the product, and upgrade when you need
+            Start free, validate the product, and upgrade manually when you need
             unlimited deal analysis, PDF export, and advanced analytics.
           </p>
         </div>
@@ -152,30 +95,6 @@ export default function PricingPageClient() {
 
       <section className="section-block">
         <div className="container">
-          {checkoutState === "success" ? (
-            <div className="billing-status-banner">
-              <div>
-                <span className="section-label">Payment successful</span>
-                <h2>
-                  {confirming
-                    ? "Confirming your Pro plan..."
-                    : "Your Stripe checkout completed."}
-                </h2>
-                <p>
-                  {confirming
-                    ? "We are syncing your subscription now."
-                    : "Your billing status was refreshed below."}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {checkoutState === "cancel" ? (
-            <div className="billing-error-box">
-              Checkout was canceled. No payment was made.
-            </div>
-          ) : null}
-
           {!loading && status ? (
             <div className="billing-status-banner">
               <div>
@@ -194,23 +113,13 @@ export default function PricingPageClient() {
 
               <div className="billing-status-actions">
                 {!status.is_pro ? (
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={handleUpgrade}
-                    disabled={checkoutLoading}
-                  >
-                    {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
-                  </button>
+                  <Link href="/upgrade" className="primary-button">
+                    Upgrade to Pro
+                  </Link>
                 ) : (
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={handleOpenPortal}
-                    disabled={portalLoading}
-                  >
-                    {portalLoading ? "Opening..." : "Billing Portal"}
-                  </button>
+                  <Link href="/dashboard" className="secondary-button">
+                    Go to Dashboard
+                  </Link>
                 )}
               </div>
             </div>
@@ -254,14 +163,9 @@ export default function PricingPageClient() {
                   {isCurrentPlan ? (
                     <div className="current-plan-badge">Current plan</div>
                   ) : isProCard ? (
-                    <button
-                      type="button"
-                      className="primary-button"
-                      onClick={handleUpgrade}
-                      disabled={checkoutLoading}
-                    >
-                      {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
-                    </button>
+                    <Link href="/upgrade" className="primary-button">
+                      Upgrade to Pro
+                    </Link>
                   ) : (
                     <Link
                       href={status ? "/dashboard" : "/signup"}
@@ -308,11 +212,11 @@ export default function PricingPageClient() {
         <div className="container">
           <div className="cta-banner">
             <div>
-              <span className="section-label">Upgrade path</span>
-              <h2>Start free. Upgrade when you are ready.</h2>
+              <span className="section-label">Manual upgrade path</span>
+              <h2>Start free. Upgrade manually when you are ready.</h2>
               <p>
-                Test your workflow with the free plan, then unlock unlimited
-                deals, PDF export, and advanced analytics with Pro.
+                Pay with Wise or Payoneer, then your Pro plan will be activated
+                manually after payment confirmation.
               </p>
             </div>
 
@@ -327,23 +231,13 @@ export default function PricingPageClient() {
                   </Link>
                 </>
               ) : status.is_pro ? (
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleOpenPortal}
-                  disabled={portalLoading}
-                >
-                  {portalLoading ? "Opening..." : "Billing Portal"}
-                </button>
+                <Link href="/dashboard" className="secondary-button">
+                  Go to Dashboard
+                </Link>
               ) : (
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={handleUpgrade}
-                  disabled={checkoutLoading}
-                >
-                  {checkoutLoading ? "Redirecting..." : "Upgrade to Pro"}
-                </button>
+                <Link href="/upgrade" className="primary-button">
+                  Upgrade to Pro
+                </Link>
               )}
             </div>
           </div>
