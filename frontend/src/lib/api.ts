@@ -223,7 +223,7 @@ export const api = {
 
   confirmCheckoutSession: (sessionId: string) =>
     request<BillingConfirmResponse>(
-      `/billing/confirm?session_id=${encodeURIComponent(sessionId)}`,
+      `/billing/confirm?checkout_session_id=${encodeURIComponent(sessionId)}`,
       {
         method: "GET",
       },

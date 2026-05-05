@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getToken } from "@/lib/auth";
-import { fetchBillingStatus, type BillingStatus } from "@/lib/billing";
+import {
+  createCheckoutSession,
+  fetchBillingStatus,
+  type BillingStatus,
+} from "@/lib/billing";
 
 const plans = [
   {
@@ -30,7 +34,7 @@ const plans = [
       "Unlimited deals",
       "PDF export",
       "Advanced analytics",
-      "Manual Pro activation after payment",
+      "Automatic Pro activation after payment",
       "Premium feature access",
       "Professional workflow",
     ],
@@ -44,12 +48,13 @@ const comparisonRows = [
   { feature: "Cap rate and ROI", free: "Included", pro: "Included" },
   { feature: "Deal score and verdict", free: "Included", pro: "Included" },
   { feature: "PDF export", free: "Not included", pro: "Included" },
-  { feature: "Payment", free: "No payment required", pro: "Wise" },
+  { feature: "Payment", free: "No payment required", pro: "Dodo Payments" },
 ];
 
 export default function PricingPageClient() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -80,6 +85,32 @@ export default function PricingPageClient() {
     void loadBillingStatus();
   }, []);
 
+  async function handleCheckout() {
+    const token = getToken();
+
+    if (!token) {
+      window.location.href = "/signup";
+      return;
+    }
+
+    try {
+      setCheckoutLoading(true);
+      setError("");
+
+      const data = await createCheckoutSession();
+
+      if (!data.checkout_url) {
+        throw new Error("Checkout URL is missing.");
+      }
+
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start checkout");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
   return (
     <main className="pricing-page">
       <section className="pricing-hero">
@@ -87,7 +118,7 @@ export default function PricingPageClient() {
           <span className="badge">Simple pricing</span>
           <h1>Choose the plan that fits your investing workflow</h1>
           <p>
-            Start free, validate the product, and upgrade manually when you need
+            Start free, validate the product, and upgrade when you need
             unlimited deal analysis, PDF export, and advanced analytics.
           </p>
         </div>
@@ -113,9 +144,16 @@ export default function PricingPageClient() {
 
               <div className="billing-status-actions">
                 {!status.is_pro ? (
-                  <Link href="/upgrade" className="primary-button">
-                    Start analyzing unlimited deals
-                  </Link>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={handleCheckout}
+                    disabled={checkoutLoading}
+                  >
+                    {checkoutLoading
+                      ? "Starting checkout..."
+                      : "Start analyzing unlimited deals"}
+                  </button>
                 ) : (
                   <Link href="/dashboard" className="secondary-button">
                     Go to Dashboard
@@ -172,9 +210,16 @@ export default function PricingPageClient() {
                     <div className="current-plan-badge">Current plan</div>
                   ) : isProCard ? (
                     <>
-                      <Link href="/upgrade" className="primary-button">
-                        Start analyzing unlimited deals
-                      </Link>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={handleCheckout}
+                        disabled={checkoutLoading}
+                      >
+                        {checkoutLoading
+                          ? "Starting checkout..."
+                          : "Start analyzing unlimited deals"}
+                      </button>
                       <p style={{ fontSize: "12px", marginTop: "8px", color: "#666" }}>
                         Early users price: $29/month. May increase later.
                       </p>
@@ -226,11 +271,11 @@ export default function PricingPageClient() {
         <div className="container">
           <div className="cta-banner">
             <div>
-              <span className="section-label">Manual upgrade path</span>
+              <span className="section-label">Upgrade path</span>
               <h2>Start free. Upgrade when you need unlimited analysis.</h2>
               <p>
-                Pay securely with Wise. Your Pro plan will be activated manually
-                after payment confirmation.
+                Pay securely with Dodo Payments. Your Pro plan will activate
+                after successful payment confirmation.
               </p>
             </div>
 
@@ -249,9 +294,16 @@ export default function PricingPageClient() {
                   Go to Dashboard
                 </Link>
               ) : (
-                <Link href="/upgrade" className="primary-button">
-                  Start analyzing unlimited deals
-                </Link>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleCheckout}
+                  disabled={checkoutLoading}
+                >
+                  {checkoutLoading
+                    ? "Starting checkout..."
+                    : "Start analyzing unlimited deals"}
+                </button>
               )}
             </div>
           </div>

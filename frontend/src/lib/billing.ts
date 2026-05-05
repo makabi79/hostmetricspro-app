@@ -12,3 +12,7 @@ export type BillingStatus = {
 export async function fetchBillingStatus(): Promise<BillingStatus> {
   return api.getBillingStatus();
 }
+
+export async function createCheckoutSession(): Promise<{ checkout_url: string }> {
+  return api.createCheckoutSession();
+}

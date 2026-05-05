@@ -69,9 +69,12 @@ def is_pro_subscription(subscription: Subscription) -> bool:
     )
 
 
-def get_user_id_from_paddle_object(paddle_object: Any) -> int | None:
-    custom_data = get_value(paddle_object, "custom_data") or {}
-    user_id_raw = get_value(custom_data, "user_id")
+def get_user_id_from_dodo_object(dodo_object: Any) -> int | None:
+    metadata = get_value(dodo_object, "metadata") or {}
+    user_id_raw = get_value(metadata, "user_id")
+
+    if not user_id_raw:
+        user_id_raw = get_nested_value(dodo_object, ["customer", "metadata", "user_id"])
 
     if not user_id_raw:
         return None
@@ -82,24 +85,80 @@ def get_user_id_from_paddle_object(paddle_object: Any) -> int | None:
         return None
 
 
+def get_dodo_subscription_id(dodo_object: Any) -> str | None:
+    value = (
+        get_value(dodo_object, "subscription_id")
+        or get_value(dodo_object, "subscriptionId")
+        or get_nested_value(dodo_object, ["subscription", "id"])
+    )
+
+    if isinstance(value, str) and value.strip():
+        return value
+
+    object_id = get_value(dodo_object, "id")
+    payload_type = get_value(dodo_object, "payload_type")
+
+    if payload_type == "Subscription" and isinstance(object_id, str) and object_id.strip():
+        return object_id
+
+    return None
+
+
+def get_dodo_customer_id(dodo_object: Any) -> str | None:
+    value = (
+        get_value(dodo_object, "customer_id")
+        or get_value(dodo_object, "customerId")
+        or get_nested_value(dodo_object, ["customer", "customer_id"])
+        or get_nested_value(dodo_object, ["customer", "id"])
+    )
+
+    if isinstance(value, str) and value.strip():
+        return value
+
+    return None
+
+
+def get_dodo_product_id(dodo_object: Any) -> str | None:
+    value = (
+        get_value(dodo_object, "product_id")
+        or get_value(dodo_object, "productId")
+        or get_nested_value(dodo_object, ["product", "id"])
+    )
+
+    if isinstance(value, str) and value.strip():
+        return value
+
+    product_cart = get_value(dodo_object, "product_cart") or []
+    if product_cart:
+        first_item = product_cart[0]
+        cart_product_id = get_value(first_item, "product_id") or get_nested_value(
+            first_item,
+            ["product", "id"],
+        )
+        if isinstance(cart_product_id, str) and cart_product_id.strip():
+            return cart_product_id
+
+    return None
+
+
 def find_subscription_for_event(
     db: Session,
-    paddle_object: Any,
+    dodo_object: Any,
 ) -> Subscription | None:
-    user_id = get_user_id_from_paddle_object(paddle_object)
+    user_id = get_user_id_from_dodo_object(dodo_object)
     if user_id is not None:
         return get_or_create_subscription(db, user_id)
 
-    paddle_subscription_id = get_value(paddle_object, "id")
-    paddle_customer_id = get_value(paddle_object, "customer_id")
+    dodo_subscription_id = get_dodo_subscription_id(dodo_object)
+    dodo_customer_id = get_dodo_customer_id(dodo_object)
 
     filters = []
 
-    if paddle_subscription_id:
-        filters.append(Subscription.paddle_subscription_id == paddle_subscription_id)
+    if dodo_subscription_id:
+        filters.append(Subscription.paddle_subscription_id == dodo_subscription_id)
 
-    if paddle_customer_id:
-        filters.append(Subscription.paddle_customer_id == paddle_customer_id)
+    if dodo_customer_id:
+        filters.append(Subscription.paddle_customer_id == dodo_customer_id)
 
     if not filters:
         return None
@@ -107,48 +166,56 @@ def find_subscription_for_event(
     return db.query(Subscription).filter(or_(*filters)).first()
 
 
-def sync_subscription_from_paddle_object(
+def sync_subscription_from_dodo_object(
     subscription: Subscription,
-    paddle_object: Any,
+    dodo_object: Any,
+    fallback_status: str,
 ) -> None:
-    paddle_status = get_value(paddle_object, "status", "inactive")
-    items = get_value(paddle_object, "items", []) or []
-    price_id = None
+    dodo_status = get_value(dodo_object, "status") or fallback_status
 
-    if items:
-        first_item = items[0]
-        price_id = get_nested_value(first_item, ["price", "id"]) or get_value(
-            first_item, "price_id"
-        )
+    if dodo_status in {"active", "renewed", "trialing"}:
+        subscription.current_plan = "pro"
+        subscription.subscription_status = "active"
+    elif dodo_status in {"on_hold", "processing"}:
+        subscription.current_plan = "free"
+        subscription.subscription_status = "inactive"
+    elif dodo_status in {"cancelled", "canceled", "failed", "expired"}:
+        subscription.current_plan = "free"
+        subscription.subscription_status = "canceled" if dodo_status in {"cancelled", "canceled"} else "inactive"
+    else:
+        subscription.current_plan = "free"
+        subscription.subscription_status = str(dodo_status)
 
-    subscription.subscription_status = paddle_status
-    subscription.current_plan = (
-        "pro" if paddle_status in {"active", "trialing"} else "free"
-    )
-    subscription.paddle_subscription_id = get_value(paddle_object, "id")
-    subscription.paddle_customer_id = get_value(paddle_object, "customer_id")
-    subscription.paddle_price_id = price_id
+    dodo_subscription_id = get_dodo_subscription_id(dodo_object)
+    dodo_customer_id = get_dodo_customer_id(dodo_object)
+    dodo_product_id = get_dodo_product_id(dodo_object)
+
+    if dodo_subscription_id:
+        subscription.paddle_subscription_id = dodo_subscription_id
+
+    if dodo_customer_id:
+        subscription.paddle_customer_id = dodo_customer_id
+
+    if dodo_product_id:
+        subscription.paddle_price_id = dodo_product_id
 
 
-def sync_customer_from_transaction_object(
+def sync_customer_from_payment_object(
     subscription: Subscription,
-    paddle_object: Any,
+    dodo_object: Any,
 ) -> None:
-    paddle_customer_id = get_value(paddle_object, "customer_id")
-    items = get_value(paddle_object, "items", []) or []
-    price_id = None
+    dodo_customer_id = get_dodo_customer_id(dodo_object)
+    dodo_subscription_id = get_dodo_subscription_id(dodo_object)
+    dodo_product_id = get_dodo_product_id(dodo_object)
 
-    if items:
-        first_item = items[0]
-        price_id = get_nested_value(first_item, ["price", "id"]) or get_value(
-            first_item, "price_id"
-        )
+    if dodo_customer_id:
+        subscription.paddle_customer_id = dodo_customer_id
 
-    if paddle_customer_id:
-        subscription.paddle_customer_id = paddle_customer_id
+    if dodo_subscription_id:
+        subscription.paddle_subscription_id = dodo_subscription_id
 
-    if price_id:
-        subscription.paddle_price_id = price_id
+    if dodo_product_id:
+        subscription.paddle_price_id = dodo_product_id
 
 
 @router.get("/status", response_model=BillingStatusResponse)
@@ -194,7 +261,7 @@ def start_checkout(
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail="Failed to create Paddle checkout session.",
+            detail="Failed to create Dodo checkout session.",
         ) from exc
 
     return CheckoutSessionResponse(checkout_url=checkout_url)
@@ -202,13 +269,17 @@ def start_checkout(
 
 @router.get("/confirm", response_model=BillingConfirmResponse)
 def confirm_checkout(
-    transaction_id: str | None = Query(default=None, min_length=1),
-    _ptxn: str | None = Query(default=None, min_length=1),
+    checkout_session_id: str | None = Query(default=None, min_length=1),
+    session_id: str | None = Query(default=None, min_length=1),
+    payment_id: str | None = Query(default=None, min_length=1),
+    subscription_id: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> BillingConfirmResponse:
-    _ = transaction_id
-    _ = _ptxn
+    _ = checkout_session_id
+    _ = session_id
+    _ = payment_id
+    _ = subscription_id
 
     subscription = get_or_create_subscription(db, current_user.id)
 
@@ -229,7 +300,7 @@ def open_billing_portal(
     if not subscription.paddle_customer_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No Paddle customer found for this user.",
+            detail="No Dodo customer found for this user.",
         )
 
     try:
@@ -294,47 +365,72 @@ def activate_pro_admin(
 
 
 @router.post("/webhook", status_code=200)
-async def paddle_webhook(
+async def dodo_webhook(
     request: Request,
-    paddle_signature: str = Header(default="", alias="Paddle-Signature"),
+    webhook_id: str = Header(default="", alias="webhook-id"),
+    webhook_signature: str = Header(default="", alias="webhook-signature"),
+    webhook_timestamp: str = Header(default="", alias="webhook-timestamp"),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     payload = await request.body()
 
     try:
-        event = construct_webhook_event(payload, paddle_signature)
+        event = construct_webhook_event(
+            payload=payload,
+            webhook_id=webhook_id,
+            webhook_signature=webhook_signature,
+            webhook_timestamp=webhook_timestamp,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    event_type = get_value(event, "event_type") or get_value(event, "type")
+    event_type = get_value(event, "type")
     data_object = get_value(event, "data")
 
-    if event_type in {
-        "transaction.completed",
-    }:
+    if not event_type or not data_object:
+        return {"received": True}
+
+    if event_type == "payment.succeeded":
         subscription = find_subscription_for_event(db, data_object)
 
         if subscription:
-            sync_customer_from_transaction_object(subscription, data_object)
+            sync_customer_from_payment_object(subscription, data_object)
+            subscription.current_plan = "pro"
+            subscription.subscription_status = "active"
             db.add(subscription)
             db.commit()
 
     if event_type in {
-        "subscription.created",
-        "subscription.trialing",
-        "subscription.activated",
+        "subscription.active",
+        "subscription.renewed",
         "subscription.updated",
-        "subscription.resumed",
-        "subscription.paused",
-        "subscription.past_due",
-        "subscription.canceled",
     }:
         subscription = find_subscription_for_event(db, data_object)
 
         if subscription:
-            sync_subscription_from_paddle_object(subscription, data_object)
+            sync_subscription_from_dodo_object(
+                subscription=subscription,
+                dodo_object=data_object,
+                fallback_status="active",
+            )
+            db.add(subscription)
+            db.commit()
+
+    if event_type in {
+        "subscription.cancelled",
+        "subscription.failed",
+        "subscription.expired",
+    }:
+        subscription = find_subscription_for_event(db, data_object)
+
+        if subscription:
+            sync_subscription_from_dodo_object(
+                subscription=subscription,
+                dodo_object=data_object,
+                fallback_status="cancelled",
+            )
             db.add(subscription)
             db.commit()
 
